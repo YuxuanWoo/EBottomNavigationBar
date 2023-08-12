@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="EBottomNavigationBar">
+        <attr name="menu" format="reference" />
+        <attr name="itemTextNormalColor" format="color" />
+        <attr name="itemTextSelectedColor" format="color" />
+        <attr name="showTopBoundary" format="boolean" />
+        <attr name="itemGradient" format="boolean" />
+        <attr name="iconSize" format="dimension" />
+    </declare-styleable>
+</resources>
