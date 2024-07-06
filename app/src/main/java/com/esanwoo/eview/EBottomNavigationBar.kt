@@ -33,31 +33,42 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
     private val itemIvs = ArrayList<LottieAnimationView>()
 
     private val ivTvMargin = 0      //icon和title之间的间距
+    private val defaultSelectedColor by lazy {
+        context.getSystemPrimaryColor() ?: Color.parseColor("#1aad19")
+    }
+
+    //自定义属性
     private var normalColor: Int
-    private var selectedColor: Int
-    private val defaultSelectedColor: Int
     private var iconSize: Float
+    private var selectedColor = defaultSelectedColor
     private var showTopBoundary: Boolean
     private var itemGradient: Boolean   //item是否渐变效果
-    private var iconScaleable = true    //todo 该属性加入xml属性配置
+    private var backgroundBlur: Boolean = true  //todo 该属性加入xml属性配置
+    private var iconScaleable: Boolean    //todo 该属性加入xml属性配置
     private var iconScaleValue = 1.5f     //todo 该属性加入xml属性配置
 
     //    private var needIconChangeColor = true
-    private var isLottieIcon: Boolean = false
+    private var isLottieIcon = false
     private var isOriginalIcons = true
 
     private var vpPositionOffset = 0f
     private var iconMeasureSize = 0
     private var selectedIndex = 0
 
-    private var topBoundaryPaint: Paint
+    private val topBoundaryPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = selectedColor
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+    }
     private val bezierPath by lazy { Path() }
 
     private var onItemSelected: OnItemSelected? = null
     private var viewPager: ViewPager2? = null
 
     /**
-     * @see pageChangeByBnv
+     *
      *  页面切换是否来自于点击底部导航栏
      *  该字段的作用是防止以下现象：
      *      选中导航栏的某一项需要vp自动切换到对应的页面，滑动vp切换页面时也需要bnv自动选中到对应的一项，
@@ -71,8 +82,6 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
     private var pageChangeByBnv = true
 
     init {
-        defaultSelectedColor = context.getSystemPrimaryColor() ?: Color.parseColor("#1aad19")
-
         val typeArray = context.obtainStyledAttributes(attrs, R.styleable.EBottomNavigationBar)
         normalColor = typeArray.getColor(
             R.styleable.EBottomNavigationBar_itemTextNormalColor,
@@ -90,14 +99,9 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
             R.styleable.EBottomNavigationBar_iconSize,
             LayoutParams.WRAP_CONTENT.toFloat()
         )
+        iconScaleable = typeArray.getBoolean(R.styleable.EBottomNavigationBar_iconScaleable, false)
 
         if (background == null) setBackgroundColor(Color.WHITE)
-
-        topBoundaryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = selectedColor
-            style = Paint.Style.STROKE
-            strokeWidth = 2f
-        }
 
         if (typeArray.hasValue(R.styleable.EBottomNavigationBar_menu)) {
             val menu = MenuBuilder(context)
@@ -134,7 +138,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
     var vpPageScrolledPosition = 0
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        if (showTopBoundary)
+        if (showTopBoundary) {
             if (isOriginalIcons || !iconScaleable)
                 canvas?.drawLine(
                     0f,
@@ -149,7 +153,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
                 bezierPath.reset()
                 //offset：凸起起点的偏移量。因为topBoundary线的凸起要随着page的滚动而移动，也就是凸起的起点要加上偏移量，值为（当前选中item起点距下一个item起点的距离）* vpPositionOffset
                 val offset =
-                    (if (vpPageScrolledPosition == itemTvs.size - 1) 0 else itemIvs[vpPageScrolledPosition + 1].left - iv.left) * vpPositionOffset
+                    (if (vpPageScrolledPosition == itemIvs.size - 1) 0 else itemIvs[vpPageScrolledPosition + 1].left - iv.left) * vpPositionOffset
                 val bezierStart = (iv.left.toFloat() - iv.measuredWidth / 2) + offset
                 bezierPath.lineTo(bezierStart, 0f)
                 val bezierControlY = -(iv.measuredHeight * iconScaleValue - iv.bottom) - 50
@@ -162,6 +166,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
                 bezierPath.lineTo(measuredWidth.toFloat(), 0f)
                 canvas?.drawPath(bezierPath, topBoundaryPaint)
             }
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -317,7 +322,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
             ) {
                 if (pageChangeByBnv)
                     return
-                if (position < itemTvs.size - 1) {
+                if (position < itemIvs.size - 1) {
                     calTransitionColor(
                         selectedColor,
                         normalColor,
@@ -334,7 +339,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
                         if (isOriginalIcons) itemIvs[position + 1].drawable.setTint(this)
                         itemTvs[position + 1].setTextColor(this)
                     }
-                    if (!isOriginalIcons) {
+                    if (iconScaleable && !isOriginalIcons) {
                         //图标缩放
                         itemIvs[position].scaleX =
                             iconScaleValue - (iconScaleValue - 1) * positionOffset
@@ -371,11 +376,11 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
         })
     }
 
-    private fun updateSelected(index: Int, callOnItemSelected: Boolean) {
+    private fun updateSelected(newIndex: Int, callOnItemSelected: Boolean) {
         invalidate()
-        if (pageChangeByBnv) viewPager?.setCurrentItem(index, false)
-        if (callOnItemSelected) onItemSelected?.invoke(index)
-        selectedIndex = index
+        if (pageChangeByBnv) viewPager?.setCurrentItem(newIndex, false)
+        if (callOnItemSelected) onItemSelected?.invoke(newIndex)
+        selectedIndex = newIndex
     }
 
     fun setOnItemSelectedListener(onItemSelected: OnItemSelected) {
@@ -389,35 +394,63 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
     }
 
     /**
-     * @param index Int
+     * @param newIndex Int
      * @param callOnItemSelected Boolean    是否触发item选中事件，由内部皮肤图标切换逻辑调用该方法时传false，外部用户调用该方法传true
      */
-    private fun setSelected(index: Int, callOnItemSelected: Boolean) {
+    private fun setSelected(newIndex: Int, callOnItemSelected: Boolean) {
         vpPageScrolledPosition =
-            index  //点击item切换时需要将vpPageScrolledPosition更新，否则onDraw时顶部边界线的凸起位置不会变
+            newIndex  //点击item切换时需要将vpPageScrolledPosition更新，否则onDraw时顶部边界线的凸起位置不会变
         pageChangeByBnv = true
+
         if (!isOriginalIcons) {
-            itemIvs[selectedIndex].scaleX = 1.0f
-            itemIvs[selectedIndex].scaleY = 1.0f
-            itemIvs[index].scaleX = iconScaleValue
-            itemIvs[index].scaleY = iconScaleValue
-            itemIvs[selectedIndex].translationY = 0f
-            itemIvs[index].translationY = -(iconScaleValue - 1) * iconMeasureSize / 2
-            if (isLottieIcon) itemIvs[index].playAnimation()
+            if (iconScaleable) {
+                itemIvs[selectedIndex].scaleX = 1.0f
+                itemIvs[selectedIndex].scaleY = 1.0f
+                itemIvs[newIndex].scaleX = iconScaleValue
+                itemIvs[newIndex].scaleY = iconScaleValue
+                itemIvs[selectedIndex].translationY = 0f
+                itemIvs[newIndex].translationY = -(iconScaleValue - 1) * iconMeasureSize / 2
+            }
+            if (isLottieIcon) itemIvs[newIndex].playAnimation()
         } else {
             itemIvs[selectedIndex].drawable.setTint(normalColor)
-            itemIvs[index].drawable.setTint(selectedColor)
+            itemIvs[newIndex].drawable.setTint(selectedColor)
         }
         itemTvs[selectedIndex].setTextColor(normalColor)
-        itemTvs[index].setTextColor(selectedColor)
+        itemTvs[newIndex].setTextColor(selectedColor)
 
-        updateSelected(index, callOnItemSelected)
+        updateSelected(newIndex, callOnItemSelected)
     }
 
     fun getSelectedIndex() = selectedIndex
 
-    private fun replaceItem() {
+    private fun replaceItem(index: Int, titleId: Int, iconId: Int) {
+        require(index < itemIvs.size) { "index out of bound!" }
+        val title = resources.getString(titleId)
+        val icon = resources.getDrawable(iconId, null)
+        checkNotNull(title) { "String not exist!" }
+        checkNotNull(icon) { "icon not exist!" }
+        replaceItem(index, title, icon)
+    }
+
+    private fun replaceItem(index: Int, title: String, icon: Drawable) {
         // TODO: replace item's title and icon
+    }
+
+    private fun addItem(title: String) {
+        // TODO: add only title item
+    }
+
+    private fun addItem(icon: Drawable) {
+        // TODO: add only icon title
+    }
+
+    fun addItem(titleId: Int, iconId: Int) {
+        val title = resources.getString(titleId)
+        val icon = resources.getDrawable(iconId, null)
+        checkNotNull(title) { "String not exist!" }
+        checkNotNull(icon) { "icon not exist!" }
+        addItem(title, icon)
     }
 
     fun addItem(title: String, icon: Drawable) {
@@ -453,8 +486,8 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
         updateColor(true)
     }
 
-    fun enableIconGradientEffect(enable: Boolean) {
-        // TODO: 图标是否开启渐变效果
+    fun enableItemGradientEffect(enable: Boolean) {
+        // TODO: 是否开启item渐变效果
         itemGradient = enable
     }
 
@@ -468,7 +501,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
             if (isOriginalIcons) itemIvs[selectedIndex].drawable.setTint(selectedColor)
             itemTvs[selectedIndex].setTextColor(selectedColor)
         } else {
-            for (i in 0 until itemTvs.size) {
+            for (i in 0 until itemIvs.size) {
                 if (i == selectedIndex)
                     continue
                 if (isOriginalIcons) itemIvs[i].drawable.setTint(normalColor)
@@ -477,28 +510,29 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
         }
     }
 
-    fun modifyLottieIcons(lotties: ArrayList<InputStream>) {
-        // TODO: 返回从lottie动画中提取的主色调颜色
-        for (i in 0 until lotties.size) {
-            itemIvs[i].run {
-                setImageDrawable(null)
-                setAnimation(lotties[i], null)
-                progress = 1f
-            }
-        }
-        originalIcons[selectedIndex].setTint(normalColor)   //防止出现如下问题：比如默认图标选中2，切换为皮肤图标，选中5，再换回默认图标，这时2和5的图标都为选中色
-        isLottieIcon = true
-        isOriginalIcons = false
-        setSelected(selectedIndex, false)
+    fun modifyLottieIconsFromIs(lottiesInputStreams: ArrayList<InputStream>) {
+        modifyLotties(lottiesInputStreams)
     }
 
-    fun modifyLottieIconsFromRawId(lottiesRawIds: ArrayList<Int?>) {
-        // TODO: 返回从lottie动画中提取的主色调颜色
-        for (i in 0 until lottiesRawIds.size) {
-            lottiesRawIds[i]?.let {
+    fun modifyLottieIconsFromId(lottiesRawIds: ArrayList<Int>) {
+        modifyLotties(lottiesRawIds)
+    }
+
+    private inline fun <reified T> modifyLotties(lotties: ArrayList<T>) {
+        // TODO: 获取从lottie动画中提取的主色调颜色
+        if (T::class == InputStream::class) {
+            for (i in 0 until lotties.size) {
                 itemIvs[i].run {
                     setImageDrawable(null)
-                    setAnimation(it)
+                    setAnimation(lotties[i] as InputStream, null)
+                    progress = 1f
+                }
+            }
+        } else {
+            for (i in 0 until lotties.size) {
+                itemIvs[i].run {
+                    setImageDrawable(null)
+                    setAnimation(lotties[i] as Int)
                     progress = 1f
                 }
             }
@@ -509,7 +543,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
         setSelected(selectedIndex, false)
     }
 
-    private fun modifyIcon(icon: Drawable, index: Int) {
+    private fun modifyIcon(index: Int, icon: Drawable) {
         // TODO: 修改单个item的图标待完善
         itemIvs[index].setImageDrawable(icon)
         isOriginalIcons = false
@@ -528,7 +562,7 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
         setSelected(selectedIndex, false)
     }
 
-    fun modifyStyleIconsFromResId(iconResIds: ArrayList<Int>) {
+    fun modifyStyleIconsFromId(iconResIds: ArrayList<Int>) {
         val drawables = ArrayList<Drawable>()
         iconResIds.forEach {
             drawables.add(context.resources.getDrawable(it, null))
@@ -541,15 +575,17 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
      */
     fun restoreMenuIcon() {
         if (!isOriginalIcons) {
-            for (i in 0 until itemTvs.size) {
+            for (i in 0 until itemIvs.size) {
                 itemIvs[i].run {
                     if (isLottieIcon) cancelAnimation()
                     setImageDrawable(originalIcons[i])
                 }
             }
-            itemIvs[selectedIndex].scaleX = 1.0f
-            itemIvs[selectedIndex].scaleY = 1.0f
-            itemIvs[selectedIndex].translationY = 0f
+            itemIvs[selectedIndex].run {
+                scaleX = 1.0f
+                scaleY = 1.0f
+                translationY = 0f
+            }
             isLottieIcon = false
             isOriginalIcons = true
 //            setSelected(selectedIndex, false)
@@ -557,17 +593,24 @@ class EBottomNavigationBar(context: Context, attrs: AttributeSet?, defStyleAttr:
     }
 
     fun recycle() {
+        onItemSelected = null
         viewPager = null
     }
 }
 
 fun Context.getSystemPrimaryColor(): Int? {
     val typedValue = TypedValue()
-    if (theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true))
-        return typedValue.data
-    else return null
+    return if (theme.resolveAttribute(
+            androidx.appcompat.R.attr.colorPrimary,
+            typedValue,
+            true
+        )
+    ) typedValue.data else null
 }
 
+/**
+ *   计算过渡中的颜色
+ */
 private fun calTransitionColor(startColor: Int, endColor: Int, percent: Float): Int {
     val startHsv = FloatArray(3)
     val endHsv = FloatArray(3)

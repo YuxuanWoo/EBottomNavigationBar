@@ -1,0 +1,1 @@
+# A bottom navigation bar that works with ViewPage2.

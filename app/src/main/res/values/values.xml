@@ -7,5 +7,6 @@
         <attr name="showTopBoundary" format="boolean" />
         <attr name="itemGradient" format="boolean" />
         <attr name="iconSize" format="dimension" />
+        <attr name="iconScaleable" format="boolean" />
     </declare-styleable>
 </resources>
